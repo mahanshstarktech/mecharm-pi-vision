@@ -8,13 +8,16 @@ A collection of three pick-and-place experiments for the **Elephant Robotics Mec
 
 ```
 mecharm-pick-place/
-├── utils.py          # Shared utilities — imported by all three experiments
-├── calibrate.py      # HSV color tuner (run before color_sort.py)
-├── get_angles.py     # Interactive joint angle reader (run before any experiment)
-├── color_sort.py     # Experiment 1 — pick and place by color
-├── shape_sort.py     # Experiment 2 — pick and place by shape
-├── follow.py         # Experiment 3 — record and replay arm sequences
-└── sequences/        # Auto-created by follow.py to store JSON sequence files
+├── src/
+│   ├── arm_utilities.py                # Shared utilities — imported by all three experiments
+│   ├── hsv_color_calibration.py        # HSV color tuner (run before color_based_pick_and_place.py)
+│   ├── joint_angle_recorder.py         # Interactive joint angle reader (run before any experiment)
+│   ├── color_based_pick_and_place.py   # Experiment 1 — pick and place by color
+│   ├── shape_based_pick_and_place.py   # Experiment 2 — pick and place by shape
+│   └── sequence_record_and_replay.py   # Experiment 3 — record and replay arm sequences
+├── sequences/                          # Auto-created by sequence_record_and_replay.py to store JSON sequence files
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -53,11 +56,11 @@ If the port is missing, enable UART in `raspi-config → Interface Options → S
 
 ### Step 1 — Find arm positions
 
-Run `get_angles.py` to find the joint angles for each position you need
+Run `joint_angle_recorder.py` to find the joint angles for each position you need
 (home, pick_above, pick_down, box). The arm goes limp so you can move it by hand.
 
 ```bash
-python get_angles.py
+python src/joint_angle_recorder.py
 ```
 
 The script prints 6-angle arrays — copy them into the `CONFIG` section
@@ -66,24 +69,24 @@ of whichever experiment script you are using.
 ### Step 2 — Tune color detection (for Experiment 1 only)
 
 ```bash
-python calibrate.py
+python src/hsv_color_calibration.py
 ```
 
 Hold each colored object in front of the camera. Drag the HSV sliders
 until only that object is white in the right half of the window. Press S
-to print the values, then copy them into `COLOR_RANGES` in `color_sort.py`.
+to print the values, then copy them into `COLOR_RANGES` in `color_based_pick_and_place.py`.
 
 ### Step 3 — Run an experiment
 
 ```bash
-python color_sort.py    # Experiment 1 — sort by color
-python shape_sort.py    # Experiment 2 — sort by shape
-python follow.py        # Experiment 3 — record and replay
+python src/color_based_pick_and_place.py    # Experiment 1 — sort by color
+python src/shape_based_pick_and_place.py    # Experiment 2 — sort by shape
+python src/sequence_record_and_replay.py    # Experiment 3 — record and replay
 ```
 
 ---
 
-## Experiment 1 — `color_sort.py`
+## Experiment 1 — `color_based_pick_and_place.py`
 
 Scans the workspace by rotating the base joint (J1) and looks for objects
 of a specified color. When found, moves to the pre-calibrated position for
@@ -99,9 +102,9 @@ that color and picks it up.
 **Key config to fill in:**
 
 ```python
-# In color_sort.py
+# In color_based_pick_and_place.py
 
-# 1. Arm positions — run get_angles.py to find these
+# 1. Arm positions — run joint_angle_recorder.py to find these
 COLOR_LOCATIONS = {
     'red': {
         'pick_above':    [...],   # arm hovering above red zone
@@ -112,7 +115,7 @@ COLOR_LOCATIONS = {
 }
 BOX_ANGLES = [...]   # where to drop objects
 
-# 2. Color detection ranges — run calibrate.py to find these
+# 2. Color detection ranges — run hsv_color_calibration.py to find these
 COLOR_RANGES = {
     'red': [
         (np.array([H_lo, S_lo, V_lo]), np.array([H_hi, S_hi, V_hi])),
@@ -132,7 +135,7 @@ SCAN_TIERS_J123 = [
 
 ---
 
-## Experiment 2 — `shape_sort.py`
+## Experiment 2 — `shape_based_pick_and_place.py`
 
 Same flow as Experiment 1 but detects **shapes** instead of colors.
 Uses contour analysis — no HSV tuning needed.
@@ -154,7 +157,7 @@ These two values are matched against ranges defined in `SHAPE_DETECTORS`.
 **Adding a new shape:**
 
 ```python
-# In shape_sort.py — SHAPE_DETECTORS
+# In shape_based_pick_and_place.py — SHAPE_DETECTORS
 'pentagon': {
     'vertices_range':    (5, 6),
     'circularity_range': (0.75, 0.92),
@@ -175,7 +178,7 @@ EPSILON_FACTOR = 0.04   # lower = more vertices, higher = fewer
 
 ---
 
-## Experiment 3 — `follow.py`
+## Experiment 3 — `sequence_record_and_replay.py`
 
 Lets you teach the arm a sequence of positions by hand and play them back.
 
@@ -212,9 +215,9 @@ Commands during recording:
 
 ---
 
-## `utils.py` — Shared Functions Reference
+## `arm_utilities.py` — Shared Functions Reference
 
-All three experiment scripts import from `utils.py`. You do not run it directly.
+All three experiment scripts import from `arm_utilities.py`. You do not run it directly.
 
 | Function | What it does |
 |---|---|
@@ -261,7 +264,7 @@ automatically computes the correct wrist angle. J5 also decreases per tier
 - This is a RAM issue on 2 GB Pi. The scripts are already optimised (320×240, 10 FPS, 1-frame buffer). If it still hangs, close other applications.
 
 **Color not detected:**
-- Re-run `calibrate.py` under the same lighting conditions as the experiment
+- Re-run `hsv_color_calibration.py` under the same lighting conditions as the experiment
 - Increase `SCAN_MIN_AREA` if getting noise, decrease if missing real objects
 
 **Shape misclassified:**
